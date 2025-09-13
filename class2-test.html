@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Class 2 Math Test</title>
+<style>
+body { font-family: Arial,sans-serif; background:#f3f4f6; margin:0; padding:20px;}
+.container { max-width:900px; margin:0 auto; background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.08);}
+.header { display:flex; justify-content:space-between; align-items:center;}
+h1{ margin:0; font-size:20px;}
+input, button, select, textarea { font-size:14px; padding:8px; border:1px solid #ddd; border-radius:6px; }
+button { cursor:pointer; }
+.grid { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;}
+.question { border:1px solid #eee; padding:10px; border-radius:8px; background:#fafafa; margin-bottom:8px;}
+.small { font-size:13px; color:#555; }
+.badge { background:#eef2ff; padding:6px 10px; border-radius:6px; }
+.alert { background:#fff4e5; padding:10px; border-radius:6px; margin-top:8px; }
+.logs { font-size:12px; color:#444; max-height:100px; overflow:auto;}
+video { width:200px; height:150px; background:#000; }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<h1>Class 2 — Math Test (25 marks)</h1>
+<div class="badge">Simple Online Test</div>
+</div>
+
+<div id="studentForm">
+<h3>Student Details</h3>
+<div class="grid">
+<input id="name" placeholder="Name">
+<input id="roll" placeholder="Roll No">
+<input id="std" placeholder="Standard" value="2">
+<input id="division" placeholder="Division">
+</div>
+<h4>Camera (mandatory)</h4>
+<p class="small">To prevent copying, camera must be ON. Snapshots kept in browser only.</p>
+<button id="cameraBtn">Turn Camera ON</button>
+<button id="startTestBtn">Start Test</button>
+<div style="display:flex;gap:12;margin-top:12;align-items:flex-start;">
+<video id="video" autoplay muted playsinline></video>
+<div>
+<p class="small">Monitoring logs:</p>
+<div id="logs" class="logs"></div>
+<p class="small">Warnings: <span id="warnings">0</span></p>
+</div>
+</div>
+<canvas id="canvas" style="display:none"></canvas>
+</div>
+
+<div id="testArea" style="display:none; margin-top:12;">
+<h3>Answer the questions — Time: 40 min (suggested)</h3>
+<div id="questionsContainer"></div>
+<button id="submitBtn">Submit & Get Result</button>
+</div>
+
+<div id="resultArea" style="display:none; margin-top:12;"></div>
+
+<script>
+// Questions
+const questions = [
+{ id: 1, type: 'mcq', q: '35 + 42 = ?', options: ['67','77','72','82'], ans: '77', marks:1 },
+{ id: 2, type: 'mcq', q: 'Which is the greatest number?', options: ['89','76','105','99'], ans: '105', marks:1 },
+{ id: 3, type: 'mcq', q: '92 – 48 = ?', options: ['44','43','42','41'], ans: '44', marks:1 },
+{ id: 4, type: 'mcq', q: '7 tens + 6 ones = ?', options: ['67','76','706','670'], ans: '76', marks:1 },
+{ id: 5, type: 'mcq', q: 'Which shape has 4 sides and 4 corners?', options: ['Triangle','Circle','Square','Oval'], ans:'Square', marks:1 },
+{ id: 6, type: 'short', q: 'Write the number name for 509.', ans: 'five hundred nine', marks:2 },
+{ id: 7, type: 'short', q: 'Arrange in ascending order: 54, 18, 92, 37', ans: '18, 37, 54, 92', marks:2 },
+{ id: 8, type: 'short', q: 'If a packet has 8 chocolates, how many chocolates are there in 5 packets?', ans: '40', marks:2 },
+{ id: 9, type: 'short', q: 'A box has 45 pencils. If 23 pencils are taken out, how many are left?', ans: '22', marks:2 },
+{ id: 10, type: 'short', q: 'Write the place value of 7 in 672.', ans: '70', marks:2 },
+{ id: 11, type: 'word', q: 'There are 48 boys and 36 girls in a class. How many students are there in total?', ans: '84', marks:5 },
+{ id: 12, type: 'word', q: 'A shopkeeper had 90 balloons. He sold 45 balloons. How many balloons are left with him?', ans: '45', marks:5 },
+];
+
+let currentAnswers = {};
+let warnings = 0;
+let logsEl = document.getElementById('logs');
+let warningsEl = document.getElementById('warnings');
+let stream = null;
+let monitorInterval = null;
+
+// Camera
+document.getElementById('cameraBtn').onclick = async function(){
+try{
+stream = await navigator.mediaDevices.getUserMedia({video:true,audio:false});
+document.getElementById('video').srcObject = stream;
+logsEl.innerHTML = 'Camera ON';
+startMonitoring();
+}catch(e){ alert('Camera access denied'); }
+};
+
+// Monitoring
+function startMonitoring(){
+if(monitorInterval) clearInterval(monitorInterval);
+monitorInterval = setInterval(()=>{
+logsEl.innerHTML = `Monitoring at ${new Date().toLocaleTimeString()}`;
+},8000);
+}
+
+// Start Test
+document.getElementById('startTestBtn').onclick = function(){
+const name=document.getElementById('name').value.trim();
+const roll=document.getElementById('roll').value.trim();
+const std=document.getElementById('std').value.trim();
+if(!name||!roll||!std||!stream){ alert('Fill details & turn camera ON'); return; }
+document.getElementById('studentForm').style.display='none';
+document.getElementById('testArea').style.display='block';
+renderQuestions();
+};
+
+// Render Questions
+function renderQuestions(){
+const container = document.getElementById('questionsContainer');
+questions.forEach(q=>{
+const div = document.createElement('div');
+div.className='question';
+div.innerHTML=`<strong>${q.id}. </strong>${q.q} <span class="small">(${q.marks} marks)</span>`;
+if(q.type==='mcq'){
+q.options.forEach(opt=>{
+const label = document.createElement('label');
+label.style.marginRight='10px';
+label.innerHTML=`<input type="radio" name="q${q.id}" value="${opt}"> ${opt}`;
+div.appendChild(label);
+});
+}else{
+const input = document.createElement('input');
+input.type='text';
+input.style.width='100%';
+input.oninput=function(){ currentAnswers[q.id]=this.value; };
+div.appendChild(input);
+}
+container.appendChild(div);
+});
+}
+
+// Submit & Result
+document.getElementById('submitBtn').onclick=function(){
+let score=0;
+questions.forEach(q=>{
+const given=currentAnswers[q.id];
+if(q.type==='mcq'){ if(given===q.ans) score+=q.marks; }
+else { if((given||'').toLowerCase().replace(/\s+/g,'')===q.ans.toLowerCase().replace(/\s+/g,'')) score+=q.marks; else if(Number(given)===Number(q.ans)) score+=q.marks; }
+});
+
+// Rating
+let rating='', stars='';
+const perc=score/25*100;
+if(perc>=90){ rating='Excellent'; stars='★★★★★'; }
+else if(perc>=75){ rating='Very Good'; stars='★★★★'; }
+else if(perc>=50){ rating='Good'; stars='★★★'; }
+else if(perc>=35){ rating='Needs Improvement'; stars='★★'; }
+else{ rating='Work Hard'; stars='★'; }
+
+// Improvement tips
+let tips=[];
+if(score<=12) tips.push('Practice basic addition/subtraction and word problems.');
+if(score>12 && score<18) tips.push('Revise number names, place value, and multi-step problems.');
+if(score>=18) tips.push('Focus on speed and accuracy.');
+
+// Olympiad recommendation
+let olympiad=[];
+if(score>=18) olympiad.push('SOF IMO / NSO - School & Higher rounds');
+else if(score>=12) olympiad.push('School-level Maths Olympiads (SOF, SilverZone)');
+else olympiad.push('Begin with school contests & strengthen basics.');
+
+// JEE fun approx (motivational)
+let jeeRank='Cannot predict from Class 2 test, but keep learning consistently for future excellence!';
+
+document.getElementById('testArea').style.display='none';
+document.getElementById('resultArea').style.display='block';
+document.getElementById('resultArea').innerHTML=`
+<h3>Result</h3>
+<p>Score: <strong>${score} / 25</strong></p>
+<p>Rating: ${rating} ${stars}</p>
+<div class="alert"><strong>Appreciation:</strong> ${score>=18?'Well done! Keep it up.':'Good effort! Keep practising.'}</div>
+<div><strong>Improvement Tips:</strong><ul>${tips.map(t=>`<li>${t}</li>`).join('')}</ul></div>
+<div><strong>Recommended Olympiads / Contests:</strong><ul>${olympiad.map(o=>`<li>${o}</li>`).join('')}</ul></div>
+<div><strong>JEE Rank Approx (Motivational):</strong><p>${jeeRank}</p></div>
+`;
+if(monitorInterval) clearInterval(monitorInterval);
+if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+};
+</script>
+</body>
+</html>
